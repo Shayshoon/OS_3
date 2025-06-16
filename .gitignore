@@ -1,1 +1,6 @@
 .idea
+*.o
+output.cgi
+server
+client
+public/
