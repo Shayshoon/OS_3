@@ -4,7 +4,7 @@
 #include "log.h"
 
 typedef struct Threads_stats {
-    int id;           // Thread ID
+    unsigned long id; // Thread ID
     int stat_req;     // Number of static requests handled
     int dynm_req;     // Number of dynamic requests handled
     int post_req;     // Number of POST requests handled
@@ -26,6 +26,6 @@ typedef struct Threads_stats {
 //   - post_req (for POST requests)
 // - These values should reflect accurate request processing for each thread and be used in response headers/logs.
 
-void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, threads_stats t_stats, server_log log);
+void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, threads_stats t_stats, ServerLog* log);
 
 #endif

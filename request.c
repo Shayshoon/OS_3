@@ -5,6 +5,8 @@
 #include "segel.h"
 #include "request.h"
 
+#define BUFFSIZE (512)
+
 int append_stats(char* buf, threads_stats t_stats, struct timeval arrival, struct timeval dispatch){
     int offset = strlen(buf);  // Start after what's already written to buf
 
@@ -172,7 +174,7 @@ void requestServeStatic(int fd, char *filename, int filesize, struct timeval arr
 	Munmap(srcp, filesize);
 }
 
-void requestServePost(int fd,  struct timeval arrival, struct timeval dispatch, threads_stats t_stats, server_log log)
+void requestServePost(int fd,  struct timeval arrival, struct timeval dispatch, threads_stats t_stats, ServerLog* log)
 {
     char header[MAXBUF], *body = NULL;
     int body_len = get_log(log, &body);
@@ -188,9 +190,8 @@ void requestServePost(int fd,  struct timeval arrival, struct timeval dispatch, 
 }
 
 // handle a request
-void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, threads_stats t_stats, server_log log)
+void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, threads_stats t_stats, ServerLog* log)
 {
-    // TODO:  should update static request stats
     int is_static;
     struct stat sbuf;
     char buf[MAXLINE], method[MAXLINE], uri[MAXLINE], version[MAXLINE];
@@ -200,6 +201,8 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
     Rio_readinitb(&rio, fd);
     Rio_readlineb(&rio, buf, MAXLINE);
     sscanf(buf, "%s %s %s", method, uri, version);
+
+    t_stats->total_req++;
 
     if (!strcasecmp(method, "GET")) {
         requestReadhdrs(&rio);
@@ -220,6 +223,7 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
                 return;
             }
 
+            t_stats->stat_req++;
             requestServeStatic(fd, filename, sbuf.st_size, arrival, dispatch, t_stats);
 
         } else {
@@ -230,12 +234,16 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
                 return;
             }
 
+            t_stats->dynm_req++;
             requestServeDynamic(fd, filename, cgiargs, arrival, dispatch, t_stats);
         }
 
-        // TODO: add log entry using add_to_log(server_log log, const char* data, int data_len);
+        char* data = (char*) malloc(BUFFSIZE);
+        int data_len = append_stats(data, t_stats, arrival, dispatch);
+        add_to_log(log, data, data_len);
 
     } else if (!strcasecmp(method, "POST")) {
+        t_stats->post_req++;
         requestServePost(fd, arrival, dispatch, t_stats, log);
 
     } else {
