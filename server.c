@@ -22,14 +22,20 @@ struct Thread_data {
 
 void* work(void* data) {
     struct Thread_data* thread_data = (struct Thread_data*) data;
-    thread_data->stats->id = pthread_self();
 
-    Node* node = q_dequeue(thread_data->queue);
+    while (1) {
 
-    while (node->fd != -1) {
+        Node* node = q_dequeue(thread_data->queue);
+
         // Record the request arrival time
         struct timeval dispatch;
         gettimeofday(&dispatch, NULL);
+        if (dispatch.tv_usec < node->arrival.tv_usec) {
+            dispatch.tv_sec -= 1;
+            dispatch.tv_usec += 1000000;
+        }
+        dispatch.tv_sec -= node->arrival.tv_sec;
+        dispatch.tv_usec -= node->arrival.tv_usec;
 
         // Process the request
         requestHandle(node->fd, node->arrival, dispatch, thread_data->stats, thread_data->log);
@@ -37,8 +43,6 @@ void* work(void* data) {
         // Close the connection
         Close(node->fd);
         free(node);
-
-        node = q_dequeue(thread_data->queue);
     }
 
     free(thread_data->stats); // Free the thread stats structure
@@ -53,6 +57,7 @@ void init_thread_pool(int pool_size, pthread_t threads[], Queue* queue, ServerLo
 
         // Create a thread stats structure
         threads_stats stats = malloc(sizeof(struct Threads_stats));
+        stats->id = i+1;
         stats->post_req = 0;         // POST request count
         stats->stat_req = 0;         // Static request count
         stats->dynm_req = 0;         // Dynamic request count
@@ -121,6 +126,8 @@ int main(int argc, char *argv[])
 
     listenfd = Open_listenfd(port);
     while (1) {
+        sem_wait(&request_queue->available_positions); // BLOCK if full
+
         clientlen = sizeof(clientaddr);
         connfd = Accept(listenfd, (SA *)&clientaddr, (socklen_t *) &clientlen);
         if (connfd < 0) {
@@ -128,10 +135,7 @@ int main(int argc, char *argv[])
             continue; // Skip to the next iteration on error
         }
 
-        // DEMO PURPOSE ONLY:
-        // This is a dummy request handler that immediately processes
-        // the request in the main thread without concurrency.
-        // Replace this with logic to enqueue the connection and let
+        // logic to enqueue the connection and let
         // a worker thread process it from the queue.
 
         struct timeval arrival;
