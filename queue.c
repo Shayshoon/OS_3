@@ -3,6 +3,7 @@
 #include <pthread.h>
 #include <semaphore.h>
 #include "queue.h"
+#include "segel.h"
 
 Queue* q_create(int size) {
     Queue* q = malloc(sizeof(Queue));
@@ -26,7 +27,7 @@ void q_enqueue(Queue* queue, int fd, struct timeval arrival) {
     Node* node = malloc(sizeof(Node));
     if (!node) {
         pthread_mutex_unlock(&queue->lock);
-        return; // handle error
+        exit(1); // Handle memory allocation failure
     }
 
     node->fd = fd;
@@ -57,7 +58,6 @@ Node* q_dequeue(Queue* queue) {
 
     queue->current_size--;
     pthread_mutex_unlock(&queue->lock);
-    sem_post(&queue->available_positions);
 
     return node;
 }

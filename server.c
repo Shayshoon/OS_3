@@ -43,6 +43,7 @@ void* work(void* data) {
         // Close the connection
         Close(node->fd);
         free(node);
+        sem_post(&thread_data->queue->available_positions);
     }
 
     free(thread_data->stats); // Free the thread stats structure
@@ -131,6 +132,7 @@ int main(int argc, char *argv[])
         clientlen = sizeof(clientaddr);
         connfd = Accept(listenfd, (SA *)&clientaddr, (socklen_t *) &clientlen);
         if (connfd < 0) {
+            sem_post(&request_queue->available_positions);
             fprintf(stderr, "Error accepting connection\n");
             continue; // Skip to the next iteration on error
         }
